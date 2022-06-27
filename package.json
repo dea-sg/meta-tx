@@ -1,6 +1,6 @@
 {
 	"name": "@dea-sg/meta-tx",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "meta transaction modules",
 	"main": "index.js",
 	"scripts": {
