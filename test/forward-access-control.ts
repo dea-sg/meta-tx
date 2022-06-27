@@ -1,6 +1,6 @@
 /* eslint-disable new-cap */
 import { expect, use } from 'chai'
-import { ethers } from 'hardhat'
+import { ethers /* upgrades */ } from 'hardhat'
 import { Wallet } from 'ethers'
 import { solidity } from 'ethereum-waffle'
 import { makeSnapshot, resetChain } from './utils'
@@ -53,4 +53,24 @@ describe('ForwarderAccessControlUpgradeable', () => {
 			expect(hasRole).to.equal(true)
 		})
 	})
+	// Describe('update', () => {
+	// 	it('update by deployer', async () => {
+	//         const foo = Wallet.createRandom()
+	//         const factory = await ethers.getContractFactory(
+	//             'ForwarderAccessControlUpgradeable'
+	//         )
+	//         const factory2 = await ethers.getContractFactory(
+	//             'ForwarderAccessControlUpgradeableTest'
+	//         )
+	//         const instance = await upgrades.deployProxy(factory, [], { kind: 'uups' })
+	// 		const forwarderRole = await instance.FORWARDER_ROLE()
+	// 		await instance.grantRole(forwarderRole, foo.address)
+	//         const beforeHasRole = await instance.isTrustedForwarder(foo.address)
+	//         expect(beforeHasRole).to.equal(true)
+
+	//         const upgraded = await upgrades.upgradeProxy(instance.address, factory2)
+	//         const afterHasRole = await upgraded.isTrustedForwarder(foo.address)
+	//         expect(afterHasRole).to.equal(true)
+	// 	})
+	// })
 })

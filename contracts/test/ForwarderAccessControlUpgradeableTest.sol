@@ -5,12 +5,13 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../interfaces/IForwarderAccessControlUpgradeable.sol";
 
-contract ForwarderAccessControlUpgradeable is
+contract ForwarderAccessControlUpgradeableTest is
 	UUPSUpgradeable,
 	AccessControlUpgradeable,
 	IForwarderAccessControlUpgradeable
 {
 	bytes32 public constant FORWARDER_ROLE = keccak256("FORWARDER_ROLE");
+	bytes32 public constant FOO_ROLE = keccak256("FOO_ROLE");
 
 	function initialize() public initializer {
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
