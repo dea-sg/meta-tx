@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: MPL-2.0
 pragma solidity =0.8.9;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "../interfaces/IForwarderAccessControlUpgradeable.sol";
 
 /**
  * @dev Context variant with ERC2771 support.
  */
-abstract contract ERC2771ContextAccessControlUpgradeable is
-	AccessControlUpgradeable
+abstract contract MetaTxContextUpgradeable is
+	Initializable,
+	ContextUpgradeable
 {
-	bytes32 public constant FORWARDER_ROLE = keccak256("FORWARDER_ROLE");
+	address public forwarderAccessControl;
 
 	// solhint-disable-next-line func-name-mixedcase
-	function __ERC2771ContextAccessControl_init() internal onlyInitializing {
-		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+	function __MetaTxContextUpgradeable_init(address _forwarderAccessControl)
+		internal
+		onlyInitializing
+	{
+		__Context_init();
+		forwarderAccessControl = _forwarderAccessControl;
 	}
 
 	function isTrustedForwarder(address forwarder) public view returns (bool) {
-		return hasRole(FORWARDER_ROLE, forwarder);
+		return
+			IForwarderAccessControlUpgradeable(forwarderAccessControl)
+				.isTrustedForwarder(forwarder);
 	}
 
 	function _msgSender()

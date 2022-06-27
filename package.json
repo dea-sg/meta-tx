@@ -19,7 +19,8 @@
 	},
 	"author": "",
 	"files": [
-		"contracts/context"
+		"contracts/context",
+		"contracts/interfaces"
 	],
 	"license": "MPL-2.0",
 	"devDependencies": {

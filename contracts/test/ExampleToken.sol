@@ -2,36 +2,33 @@
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "../context/ERC2771ContextAccessControlUpgradeable.sol";
+import "../context/MetaTxContextUpgradeable.sol";
 
-contract ExampleToken is
-	ERC20Upgradeable,
-	ERC2771ContextAccessControlUpgradeable
-{
+contract ExampleToken is ERC20Upgradeable, MetaTxContextUpgradeable {
 	bytes public currentData;
 
-	function initialize() public initializer {
+	function initialize(address _forwarderAccessControl) public initializer {
 		__ERC20_init("token", "TOKEN");
-		__ERC2771ContextAccessControl_init();
+		__MetaTxContextUpgradeable_init(_forwarderAccessControl);
 		_mint(msg.sender, 100000000000000000000);
 	}
 
 	function _msgSender()
 		internal
 		view
-		override(ContextUpgradeable, ERC2771ContextAccessControlUpgradeable)
+		override(ContextUpgradeable, MetaTxContextUpgradeable)
 		returns (address sender)
 	{
-		return ERC2771ContextAccessControlUpgradeable._msgSender();
+		return MetaTxContextUpgradeable._msgSender();
 	}
 
 	function _msgData()
 		internal
 		view
-		override(ContextUpgradeable, ERC2771ContextAccessControlUpgradeable)
+		override(ContextUpgradeable, MetaTxContextUpgradeable)
 		returns (bytes memory)
 	{
-		return ERC2771ContextAccessControlUpgradeable._msgData();
+		return MetaTxContextUpgradeable._msgData();
 	}
 
 	function getMsgData() external view returns (bytes memory) {

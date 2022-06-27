@@ -5,25 +5,39 @@ import { ethers } from 'hardhat'
 import { Wallet } from 'ethers'
 import { solidity } from 'ethereum-waffle'
 import { makeSnapshot, resetChain } from './utils'
-import { ExampleToken, MinimalForwarder } from '../typechain-types'
+import {
+	ExampleToken,
+	MinimalForwarder,
+	ForwarderAccessControlUpgradeable,
+} from '../typechain-types'
 
 use(solidity)
 
 describe('Example', () => {
 	let example: ExampleToken
+	let control: ForwarderAccessControlUpgradeable
 	let forwarder: MinimalForwarder
 	let snapshot: string
 	const BALANCE_SUFFIX = '000000000000000000'
 	before(async () => {
+		const factory = await ethers.getContractFactory(
+			'ForwarderAccessControlUpgradeable'
+		)
+		control = (await factory.deploy()) as ForwarderAccessControlUpgradeable
+		await control.deployed()
+		await control.initialize()
+
 		const exampleFactory = await ethers.getContractFactory('ExampleToken')
 		example = (await exampleFactory.deploy()) as ExampleToken
 		await example.deployed()
-		await example.initialize()
+		await example.initialize(control.address)
+
 		const forwarderFactory = await ethers.getContractFactory('MinimalForwarder')
 		forwarder = (await forwarderFactory.deploy()) as MinimalForwarder
 		await forwarder.deployed()
-		const forwarderRole = await example.FORWARDER_ROLE()
-		await example.grantRole(forwarderRole, forwarder.address)
+
+		const forwarderRole = await control.FORWARDER_ROLE()
+		await control.grantRole(forwarderRole, forwarder.address)
 	})
 	beforeEach(async () => {
 		snapshot = await makeSnapshot()
