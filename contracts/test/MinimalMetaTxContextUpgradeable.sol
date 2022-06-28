@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 pragma solidity =0.8.9;
 
-import "../context/MetaTxContextUpgradeable.sol";
+import "../metatx/MetaTxContextUpgradeable.sol";
 
 contract MinimalMetaTxContextUpgradeable is MetaTxContextUpgradeable {
 	function initialize(address _forwarderAccessControl) public initializer {
-		__MetaTxContextUpgradeable_init(_forwarderAccessControl);
+		__MetaTxContext_init(_forwarderAccessControl);
 	}
 
 	function getMsgSender() external view returns (address sender) {

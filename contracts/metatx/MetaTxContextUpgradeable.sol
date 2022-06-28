@@ -15,7 +15,7 @@ abstract contract MetaTxContextUpgradeable is
 	address public forwarderAccessControl;
 
 	// solhint-disable-next-line func-name-mixedcase
-	function __MetaTxContextUpgradeable_init(address _forwarderAccessControl)
+	function __MetaTxContext_init(address _forwarderAccessControl)
 		internal
 		onlyInitializing
 	{

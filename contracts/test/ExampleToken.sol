@@ -2,14 +2,14 @@
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "../context/MetaTxContextUpgradeable.sol";
+import "../metatx/MetaTxContextUpgradeable.sol";
 
 contract ExampleToken is ERC20Upgradeable, MetaTxContextUpgradeable {
 	bytes public currentData;
 
 	function initialize(address _forwarderAccessControl) public initializer {
 		__ERC20_init("token", "TOKEN");
-		__MetaTxContextUpgradeable_init(_forwarderAccessControl);
+		__MetaTxContext_init(_forwarderAccessControl);
 		_mint(msg.sender, 100000000000000000000);
 	}
 
