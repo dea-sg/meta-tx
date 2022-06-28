@@ -15,4 +15,10 @@ contract MinimalMetaTxContextUpgradeable is MetaTxContextUpgradeable {
 	function getMsgData() external view returns (bytes calldata) {
 		return _msgData();
 	}
+
+	function setForwarderAccessControlTest(address _forwarderAccessControl)
+		external
+	{
+		setForwarderAccessControl(_forwarderAccessControl);
+	}
 }

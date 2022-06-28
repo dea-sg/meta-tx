@@ -18,12 +18,12 @@ contract ForwarderAccessControlUpgradeable is
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 	}
 
-	function isTrustedForwarder(address forwarder)
+	function isTrustedForwarder(address _forwarder)
 		external
 		view
 		returns (bool)
 	{
-		return hasRole(FORWARDER_ROLE, forwarder);
+		return hasRole(FORWARDER_ROLE, _forwarder);
 	}
 
 	function _authorizeUpgrade(address)

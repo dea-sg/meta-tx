@@ -37,6 +37,14 @@ describe('MinimalMetaTxContextUpgradeable', () => {
 	afterEach(async () => {
 		await resetChain(snapshot)
 	})
+	describe('setForwarderAccessControl', () => {
+		it('set address', async () => {
+			expect(await minimal.forwarderAccessControl()).to.equal(control.address)
+			const tmp = Wallet.createRandom()
+			await minimal.setForwarderAccessControlTest(tmp.address)
+			expect(await minimal.forwarderAccessControl()).to.equal(tmp.address)
+		})
+	})
 	describe('isTrustedForwarder', () => {
 		it('not have role', async () => {
 			const uerWallet = Wallet.createRandom()

@@ -23,10 +23,16 @@ abstract contract MetaTxContextUpgradeable is
 		forwarderAccessControl = _forwarderAccessControl;
 	}
 
-	function isTrustedForwarder(address forwarder) public view returns (bool) {
+	function setForwarderAccessControl(address _forwarderAccessControl)
+		internal
+	{
+		forwarderAccessControl = _forwarderAccessControl;
+	}
+
+	function isTrustedForwarder(address _forwarder) public view returns (bool) {
 		return
 			IForwarderAccessControlUpgradeable(forwarderAccessControl)
-				.isTrustedForwarder(forwarder);
+				.isTrustedForwarder(_forwarder);
 	}
 
 	function _msgSender()
