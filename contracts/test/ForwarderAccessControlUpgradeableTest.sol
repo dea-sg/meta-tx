@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 pragma solidity =0.8.9;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../interfaces/IForwarderAccessControlUpgradeable.sol";
 
 contract ForwarderAccessControlUpgradeableTest is
 	UUPSUpgradeable,
-	AccessControlUpgradeable,
+	AccessControlEnumerableUpgradeable,
 	IForwarderAccessControlUpgradeable
 {
 	bytes32 public constant FORWARDER_ROLE = keccak256("FORWARDER_ROLE");

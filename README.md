@@ -13,47 +13,59 @@ or
 npm install @dea-sg/meta-tx
 ```
 
-Inheriting ERC2771ContextAccessControlUpgradeable changes the function of the \_msgSender of the contract executed from the metatransaction and changes the sender to the intended one.
+After deploying ForwarderAccessControlUpgradeable with proxy(uups), the deployer should execute the following function.
+Set the forwarder address to the address of the contract executing the metatransaction.
+
+```
+await control.initialize()
+const forwarderRole = await control.FORWARDER_ROLE()
+await control.grantRole(forwarderRole, {forwarder address})
+const hasRole = await control.isTrustedForwarder(foo.address)
+console.log(hasRole)
+>> True
+```
+
+Inheriting MetaTxContextUpgradeable changes the function of the \_msgSender of the contract executed from the metatransaction and changes the sender to the intended one.
+The ForwarderAccessControl address must be set in initialize.
 
 ```
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@dea-sg/meta-tx/contracts/context/ERC2771ContextAccessControlUpgradeable.sol";
+import "@dea-sg/meta-tx/contracts/context/MetaTxContextUpgradeable.sol";
 
 contract ExampleToken is
 	ERC20Upgradeable,
-	ERC2771ContextAccessControlUpgradeable
+	MetaTxContextUpgradeable
 {
 	bytes public currentData;
-	function initialize() public initializer {
+	function initialize(address _forwarder) public initializer {
 		__ERC20_init("token", "TOKEN");
-		__ERC2771ContextAccessControl_init();
+		__MetaTxContextUpgradeable_init(_forwarder);
 	}
 
 	function _msgSender()
 		internal
 		view
-		override(ContextUpgradeable, ERC2771ContextAccessControlUpgradeable)
+		override(ContextUpgradeable, MetaTxContextUpgradeable)
 		returns (address sender)
 	{
-		return ERC2771ContextAccessControlUpgradeable._msgSender();
+		return MetaTxContextUpgradeable._msgSender();
 	}
 
 	function _msgData()
 		internal
 		view
-		override(ContextUpgradeable, ERC2771ContextAccessControlUpgradeable)
+		override(ContextUpgradeable, MetaTxContextUpgradeable)
 		returns (bytes memory)
 	{
-		return ERC2771ContextAccessControlUpgradeable._msgData();
+		return MetaTxContextUpgradeable._msgData();
 	}
 }
 ```
 
-After deploying, do not forget to register the forwarder that will execute the meta-transaction.
+After deploying, do not forget to execute initialize function.
 
 ```
-const forwarderRole = await example.FORWARDER_ROLE()
-await example.grantRole(forwarderRole, forwarder.address)
+await example.initialize(forwarder.address)
 ```
 
 ## For Developers

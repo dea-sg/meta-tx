@@ -1,5 +1,6 @@
 /* eslint-disable new-cap */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import { ethers, upgrades } from 'hardhat'
 
 // Signerが変わればupdateできないことをテストすること！
@@ -23,3 +24,9 @@ main()
 		console.error(error)
 		process.exit(1)
 	})
+
+// Memo
+// npx hardhat run dist/scripts/deploy-control.js --network polygonMumbai
+// npx hardhat verify --contract contracts/access/ForwarderAccessControlUpgradeable.sol:ForwarderAccessControlUpgradeable --network polygonMumbai 0x0a31115725a4a91643191bdf2aD3F1AAe3636351
+// proxy was deployed to: 0xb1d500041dB4311B811895c51407957c749b202A
+// logic was deployed to: 0x0a31115725a4a91643191bdf2aD3F1AAe3636351

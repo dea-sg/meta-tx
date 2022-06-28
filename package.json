@@ -20,6 +20,7 @@
 	"author": "",
 	"files": [
 		"contracts/context",
+		"contracts/access",
 		"contracts/interfaces"
 	],
 	"license": "MPL-2.0",
