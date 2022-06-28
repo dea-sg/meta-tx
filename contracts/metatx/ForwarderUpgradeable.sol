@@ -23,8 +23,6 @@ contract ForwarderUpgradeable is
 		uint256 nonce;
 		uint256 expiry;
 		bytes data;
-		address token;
-		uint256 amount;
 	}
 	event MetaTransaction(
 		address indexed from,
@@ -43,9 +41,7 @@ contract ForwarderUpgradeable is
 				"uint256 gas,",
 				"uint256 nonce,",
 				"uint256 expiry,",
-				"bytes data,",
-				"address token,",
-				"uint256 amount",
+				"bytes data",
 				")"
 			)
 		);
@@ -53,6 +49,7 @@ contract ForwarderUpgradeable is
 
 	bytes32 public constant EXECUTE_ROLE = keccak256("EXECUTE_ROLE");
 	bool private lock = false;
+	bool private isBatchProcessing = false;
 
 	function initialize(string memory name, string memory version)
 		public
@@ -120,9 +117,7 @@ contract ForwarderUpgradeable is
 					req.gas,
 					req.nonce,
 					req.expiry,
-					keccak256(req.data),
-					req.token,
-					req.amount
+					keccak256(req.data)
 				)
 			);
 	}
@@ -133,7 +128,7 @@ contract ForwarderUpgradeable is
 		onlyRole(EXECUTE_ROLE)
 		returns (bool, bytes memory)
 	{
-		require(!lock, "in progress");
+		require(!isLocked(), "in progress");
 		lock = true;
 		require(verify(req, signature), "signature does not match request");
 		_nonces[req.from] = req.nonce + 1;
@@ -159,16 +154,25 @@ contract ForwarderUpgradeable is
 		return (success, returndata);
 	}
 
+	function isLocked() private view returns (bool) {
+		if (isBatchProcessing) {
+			return false;
+		}
+		return lock;
+	}
+
 	function batch(ForwardRequest[] calldata reqs, bytes[] calldata signatures)
 		public
 		payable
 	{
 		require(msg.sender == address(this), "inner execute only");
 		require(reqs.length == signatures.length, "illegal params");
+		isBatchProcessing = true;
 		// 外から不正に実行されないかチェックする
 		for (uint256 i = 0; i < reqs.length; i++) {
 			execute(reqs[i], signatures[i]);
 		}
+		isBatchProcessing = false;
 	}
 
 	/**
