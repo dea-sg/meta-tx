@@ -27,14 +27,7 @@ interface MessageTypes {
 }
 const BALANCE_SUFFIX = '000000000000000000'
 
-// EIP4337
-// https://twitter.com/yamapyblack/status/1541790750798512128?s=20&t=BuWUcyvc5QLr3VjbPIiNlw
-// https://zenn.dev/sivira/articles/d041f1ac44ca1e
-// https://twitter.com/ccassets/status/1541940760454778880?s=12&t=hHr4bCWW71Z5DUtZvfjHfg
-
-// どこがどのEIPだかERCだかを調べる
-
-describe('MetaTransactionRelayer', () => {
+describe('ForwarderUpgradeable', () => {
 	let relayer: ForwarderUpgradeable
 	let control: ForwarderAccessControlUpgradeable
 	let token: ExampleToken
