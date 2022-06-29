@@ -40,12 +40,12 @@ abstract contract MetaTxContextUpgradeable is
 		view
 		virtual
 		override
-		returns (address sender)
+		returns (address _sender)
 	{
 		if (isTrustedForwarder(msg.sender)) {
 			// solhint-disable-next-line no-inline-assembly
 			assembly {
-				sender := shr(96, calldataload(sub(calldatasize(), 20)))
+				_sender := shr(96, calldataload(sub(calldatasize(), 20)))
 			}
 		} else {
 			return super._msgSender();

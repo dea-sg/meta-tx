@@ -6,9 +6,6 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgra
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 
-/**
- * @dev Simple minimal forwarder to be used together with an ERC2771 compatible contract. See {ERC2771Context}.
- */
 contract ForwarderUpgradeable is
 	Initializable,
 	EIP712Upgradeable,
@@ -45,17 +42,27 @@ contract ForwarderUpgradeable is
 				")"
 			)
 		);
-	mapping(address => uint256) private _nonces;
+	mapping(address => uint256) private nonces;
 
 	bytes32 public constant EXECUTE_ROLE = keccak256("EXECUTE_ROLE");
 	bool private lock = false;
-	bool private isBatchProcessing = false;
+	bool private batchLock = false;
 
-	function initialize(string memory name, string memory version)
+	modifier onlyExecuter() {
+		if (batchLock) {
+			if (_msgSender() == address(this)) {
+				return;
+			}
+		}
+		_checkRole(EXECUTE_ROLE);
+		_;
+	}
+
+	function initialize(string memory _name, string memory _version)
 		public
 		initializer
 	{
-		__EIP712_init_unchained(name, version);
+		__EIP712_init_unchained(_name, _version);
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 	}
 
@@ -69,40 +76,25 @@ contract ForwarderUpgradeable is
 		require(cnt == 0, "not pause");
 	}
 
-	function getNonce(address from) public view returns (uint256) {
-		return _nonces[from];
+	function getNonce(address _from) public view returns (uint256) {
+		return nonces[_from];
 	}
 
-	// If executed from a contract, it must correspond to ERC1271 and ERC1654
-	// example)
-	// if (callData.signatureType == SignatureType.EIP1271) {
-	//     require(
-	//         ERC1271(callData.from).isValidSignature(dataToHash, callData.signature) == ERC1271_MAGICVALUE,
-	//         "invalid 1271 signature"
-	//     );
-	// } else if(callData.signatureType == SignatureType.EIP1654){
-	//     require(
-	//         ERC1654(callData.from).isValidSignature(keccak256(dataToHash), callData.signature) == ERC1654_MAGICVALUE,
-	//         "invalid 1654 signature"
-	//     );
-	// } else {
-	//     address signer = SigUtil.recover(keccak256(dataToHash), callData.signature);
-	//     require(signer == callData.from, "signer != from");
-	// }
-	function verify(ForwardRequest calldata req, bytes calldata signature)
+	function verify(ForwardRequest calldata _req, bytes calldata _signature)
 		public
 		view
 		returns (bool)
 	{
-		address signer = _hashTypedDataV4(makeHashFromParam(req)).recover(
-			signature
+		// EIP712
+		address signer = _hashTypedDataV4(makeHashFromParam(_req)).recover(
+			_signature
 		);
 		// solhint-disable-next-line not-rely-on-time
-		require(block.timestamp < req.expiry, "expired"); //EIPなんとか
-		return _nonces[req.from] == req.nonce && signer == req.from;
+		require(block.timestamp < _req.expiry, "expired"); //EIPなんとか
+		return nonces[_req.from] == _req.nonce && signer == _req.from;
 	}
 
-	function makeHashFromParam(ForwardRequest calldata req)
+	function makeHashFromParam(ForwardRequest calldata _req)
 		private
 		pure
 		returns (bytes32)
@@ -111,36 +103,51 @@ contract ForwarderUpgradeable is
 			keccak256(
 				abi.encode(
 					_TYPEHASH,
-					req.from,
-					req.to,
-					req.value,
-					req.gas,
-					req.nonce,
-					req.expiry,
-					keccak256(req.data)
+					_req.from,
+					_req.to,
+					_req.value,
+					_req.gas,
+					_req.nonce,
+					_req.expiry,
+					keccak256(_req.data)
 				)
 			);
 	}
 
-	function execute(ForwardRequest calldata req, bytes calldata signature)
+	function execute(ForwardRequest calldata _req, bytes calldata _signature)
 		public
 		payable
-		onlyRole(EXECUTE_ROLE)
-		returns (bool, bytes memory)
+		onlyExecuter
+		returns (bool _success, bytes memory _returndata)
 	{
-		require(!isLocked(), "in progress");
+		require(!lock, "in progress");
 		lock = true;
-		require(verify(req, signature), "signature does not match request");
-		_nonces[req.from] = req.nonce + 1;
+		(_success, _returndata) = innerExecute(_req, _signature);
+		lock = false;
+		return (_success, _returndata);
+	}
+
+	function innerExecute(
+		ForwardRequest calldata _req,
+		bytes calldata _signature
+	)
+		public
+		payable
+		onlyExecuter
+		returns (bool _success, bytes memory _returndata)
+	{
+		require(verify(_req, _signature), "signature does not match request");
+		nonces[_req.from] = _req.nonce + 1;
 		// solhint-disable-next-line avoid-low-level-calls
-		(bool success, bytes memory returndata) = req.to.call{
-			gas: req.gas,
-			value: req.value
-		}(abi.encodePacked(req.data, req.from));
-		require(success, "call error");
+		(_success, _returndata) = _req.to.call{
+			gas: _req.gas,
+			value: _req.value
+		}(abi.encodePacked(_req.data, _req.from));
+		require(_success, "call error");
 		// Validate that the relayer has sent enough gas for the call.
 		// See https://ronan.eth.link/blog/ethereum-gas-dangers/
-		if (gasleft() <= req.gas / 63) {
+		if (gasleft() <= _req.gas / 63) {
+			// EIP-1930?
 			// We explicitly trigger invalid opcode to consume all gas and bubble-up the effects, since
 			// neither revert or assert consume all gas since Solidity 0.8.0
 			// https://docs.soliditylang.org/en/v0.8.0/control-structures.html#panic-via-assert-and-error-via-require
@@ -149,30 +156,28 @@ contract ForwarderUpgradeable is
 				invalid()
 			}
 		}
-		emit MetaTransaction(req.from, req.nonce, req, success, returndata);
-		lock = false;
-		return (success, returndata);
+		emit MetaTransaction(
+			_req.from,
+			_req.nonce,
+			_req,
+			_success,
+			_returndata
+		);
+		return (_success, _returndata);
 	}
 
-	function isLocked() private view returns (bool) {
-		if (isBatchProcessing) {
-			return false;
-		}
-		return lock;
-	}
-
-	function batch(ForwardRequest[] calldata reqs, bytes[] calldata signatures)
-		public
-		payable
-	{
+	function batch(
+		ForwardRequest[] calldata _reqs,
+		bytes[] calldata _signatures
+	) public payable {
 		require(msg.sender == address(this), "inner execute only");
-		require(reqs.length == signatures.length, "illegal params");
-		isBatchProcessing = true;
-		// 外から不正に実行されないかチェックする
-		for (uint256 i = 0; i < reqs.length; i++) {
-			execute(reqs[i], signatures[i]);
+		require(_reqs.length == _signatures.length, "illegal params");
+		require(batchLock == false, "batch processing");
+		batchLock = true;
+		for (uint256 i = 0; i < _reqs.length; i++) {
+			innerExecute(_reqs[i], _signatures[i]);
 		}
-		isBatchProcessing = false;
+		batchLock = false;
 	}
 
 	/**

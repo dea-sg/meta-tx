@@ -1,6 +1,5 @@
 import { ethers, upgrades } from 'hardhat'
 
-// Signerが変わればupdateできないことをテストすること！
 async function main() {
 	const controlFactory = await ethers.getContractFactory(
 		'ForwarderAccessControlUpgradeableTest2'

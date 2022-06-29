@@ -7,13 +7,13 @@ import { signTypedMessage, TypedMessage } from 'eth-sig-util'
 import { toBuffer } from 'ethereumjs-util'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { Wallet, BigNumber, constants } from 'ethers'
+import { Wallet, BigNumber } from 'ethers'
 import { makeSnapshot, resetChain } from './utils'
 import {
 	ForwarderAccessControlUpgradeable,
 	ForwarderUpgradeable,
-	TestTarget,
 	ExampleToken,
+	TestNFT,
 } from '../typechain-types'
 
 interface MessageTypeProperty {
@@ -25,20 +25,22 @@ interface MessageTypes {
 	[additionalProperties: string]: MessageTypeProperty[]
 }
 const BALANCE_SUFFIX = '000000000000000000'
-// TODO 警告の削除
-// TODO トークンでガスを支払う処理を追加する
-// TODO GenericMetaTxProcessorの足りない機能やセキュリティを実装する
-// どこがどのEIPだかERC高を調べる
-// permitのケースを記録しておく
-// ERC20のテストケースに置き換える
-// TODO bathからbatchを実行された時の対策
-// TODO batchからexecuteされた時の対策
+
+// EIP4337
+// https://twitter.com/yamapyblack/status/1541790750798512128?s=20&t=BuWUcyvc5QLr3VjbPIiNlw
+// https://zenn.dev/sivira/articles/d041f1ac44ca1e
+// https://twitter.com/ccassets/status/1541940760454778880?s=12&t=hHr4bCWW71Z5DUtZvfjHfg
+
+// どこがどのEIPだかERCだかを調べる
+
 // batchの中で別のユーザの処理をしてもOKなことを確認
+// TODO トークンでガスを支払う処理を追加する
+
 describe('MetaTransactionRelayer', () => {
 	let relayer: ForwarderUpgradeable
-	let target: TestTarget
 	let control: ForwarderAccessControlUpgradeable
 	let token: ExampleToken
+	let nft: TestNFT
 	let snapshot: string
 
 	type Message = {
@@ -119,6 +121,7 @@ describe('MetaTransactionRelayer', () => {
 	}
 
 	before(async () => {
+		const [signer] = await ethers.getSigners()
 		const factory = await ethers.getContractFactory(
 			'ForwarderAccessControlUpgradeable'
 		)
@@ -138,17 +141,16 @@ describe('MetaTransactionRelayer', () => {
 		await relayer.deployed()
 		await relayer.initialize('Forwarder', '0.0.1')
 		const executeRole = await relayer.EXECUTE_ROLE()
-		const [signer] = await ethers.getSigners()
 
 		await relayer.grantRole(executeRole, signer.address)
-		await relayer.grantRole(executeRole, relayer.address)
 
-		const targetFactory = await ethers.getContractFactory('TestTarget')
-		target = (await targetFactory.deploy()) as TestTarget
-		await target.deployed()
-		await target.initialize(control.address)
 		const forwarderRole = await control.FORWARDER_ROLE()
 		await control.grantRole(forwarderRole, relayer.address)
+
+		const testNFTFactory = await ethers.getContractFactory('TestNFT')
+		nft = (await testNFTFactory.deploy()) as TestNFT
+		await nft.deployed()
+		await nft.initialize(control.address)
 	})
 	beforeEach(async () => {
 		snapshot = await makeSnapshot()
@@ -156,36 +158,37 @@ describe('MetaTransactionRelayer', () => {
 	afterEach(async () => {
 		await resetChain(snapshot)
 	})
-	it('forward', async () => {
+	it.only('erc20 transfer', async () => {
 		const userWallet = Wallet.createRandom()
-		const arg1Wallet = Wallet.createRandom()
-		const arg2Wallet = Wallet.createRandom()
-		const arg3 = 192836
+		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
+		const companyWallet = Wallet.createRandom()
 		const iface = new ethers.utils.Interface([
-			'function testFunc(address _arg1, address _arg2, uint256 _arg3)',
+			'function transfer(address to, uint256 amount)',
 		])
-		const functionSignature = iface.encodeFunctionData('testFunc', [
-			arg1Wallet.address,
-			arg2Wallet.address,
-			arg3,
+		const functionEncoded = iface.encodeFunctionData('transfer', [
+			companyWallet.address,
+			'10' + BALANCE_SUFFIX,
 		])
 		const nonce: BigNumber = await relayer.getNonce(userWallet.address)
 		const message = await createMessage(
 			userWallet.address,
-			target.address,
+			token.address,
 			0,
 			100000000,
 			nonce.toNumber(),
-			functionSignature
+			functionEncoded
 		)
 		const msgParams = await createMessageParam(message, relayer.address)
 		const signature = signTypedMessage(toBuffer(userWallet.privateKey), {
 			data: msgParams,
 		})
-		expect(await target.beforeSender()).to.equal(constants.AddressZero)
-		expect(await target.arg1()).to.equal(constants.AddressZero)
-		expect(await target.arg2()).to.equal(constants.AddressZero)
-		expect((await target.arg3()).toString()).to.equal('0')
+
+		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
+		expect(userEthBalance.toString()).to.equal('0')
+		const userTokenBalance = await token.balanceOf(userWallet.address)
+		expect(userTokenBalance.toString()).to.equal('10' + BALANCE_SUFFIX)
+		const companyTokenBalance = await token.balanceOf(companyWallet.address)
+		expect(companyTokenBalance.toString()).to.equal('0')
 		await relayer.execute(
 			{
 				from: message.from,
@@ -198,108 +201,183 @@ describe('MetaTransactionRelayer', () => {
 			},
 			signature
 		)
-		expect(await target.beforeSender()).to.equal(message.from)
-		expect(await target.arg1()).to.equal(arg1Wallet.address)
-		expect(await target.arg2()).to.equal(arg2Wallet.address)
-		expect((await target.arg3()).toString()).to.equal(String(arg3))
+		const userEthBalanceAfter = await ethers.provider.getBalance(
+			userWallet.address
+		)
+		expect(userEthBalanceAfter.toString()).to.equal('0')
+		const userTokenBalanceAfter = await token.balanceOf(userWallet.address)
+		expect(userTokenBalanceAfter.toString()).to.equal('0')
+		const companyTokenBalanceAfter = await token.balanceOf(
+			companyWallet.address
+		)
+		expect(companyTokenBalanceAfter.toString()).to.equal('10' + BALANCE_SUFFIX)
 	})
 	it.only('pay token and mint nft', async () => {
+		// 登場人物
 		const userWallet = Wallet.createRandom()
-		const arg1Wallet = Wallet.createRandom()
-		const arg2Wallet = Wallet.createRandom()
-		const arg3 = 192836
+		const companyWallet = Wallet.createRandom()
+		const minterWallet = Wallet.createRandom()
+
+		// Token transfer
 		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
-		const iface = new ethers.utils.Interface([
-			'function testFunc(address _arg1, address _arg2, uint256 _arg3)',
+		const ifaceTokenTransfer = new ethers.utils.Interface([
+			'function transfer(address to, uint256 amount)',
 		])
-		const functionSignature = iface.encodeFunctionData('testFunc', [
-			arg1Wallet.address,
-			arg2Wallet.address,
-			arg3,
-		])
-		const nonce: BigNumber = await relayer.getNonce(userWallet.address)
-		const network = await ethers.provider.getNetwork()
-		const { chainId } = network
-
-		const blockNumber = await ethers.provider.getBlockNumber()
-		const blockInfo = await ethers.provider.getBlock(blockNumber)
-		const deadline_ = blockInfo.timestamp + 100
-
-		const message = await createMessage(
-			userWallet.address,
-			target.address,
-			0,
-			10000000,
-			nonce.add(1).toNumber(),
-			functionSignature
+		const functionEncodedTokenTransfer = ifaceTokenTransfer.encodeFunctionData(
+			'transfer',
+			[companyWallet.address, '10' + BALANCE_SUFFIX]
 		)
-
-		const msgParams = await createMessageParam(message, relayer.address)
-		const signature = signTypedMessage(toBuffer(userWallet.privateKey), {
-			data: msgParams,
-		})
-		const message2 = await createMessage(
+		const userNonce: BigNumber = await relayer.getNonce(userWallet.address)
+		const messageTokenTransfer = await createMessage(
 			userWallet.address,
-			target.address,
-			0,
-			10000000,
-			nonce.add(2).toNumber(),
-			functionSignature
-		)
-		const msgParams2 = await createMessageParam(message2, relayer.address)
-		const signature2 = signTypedMessage(toBuffer(userWallet.privateKey), {
-			data: msgParams2,
-		})
-
-		const iface3 = new ethers.utils.Interface([
-			'function batch(tuple(address from, address to, uint256 value, uint256 gas, uint256 nonce, uint256 expiry, bytes data)[] reqs, bytes[] signatures)',
-		])
-		const functionSignature3 = iface3.encodeFunctionData('batch', [
-			[
-				{
-					from: message.from,
-					to: message.to,
-					value: message.value,
-					gas: message.gas,
-					nonce: message.nonce,
-					expiry: message.expiry,
-					data: message.data,
-				},
-				{
-					from: message2.from,
-					to: message2.to,
-					value: message2.value,
-					gas: message2.gas,
-					nonce: message2.nonce,
-					expiry: message2.expiry,
-					data: message2.data,
-				},
-			],
-			[signature, signature2],
-		])
-		const message3 = await createMessage(
-			userWallet.address,
-			relayer.address,
+			token.address,
 			0,
 			100000000,
-			nonce.toNumber(),
-			functionSignature3
+			userNonce.toNumber(),
+			functionEncodedTokenTransfer
 		)
-		const msgParams3 = await createMessageParam(message3, relayer.address)
-		const signature3 = signTypedMessage(toBuffer(userWallet.privateKey), {
-			data: msgParams3,
-		})
-		await relayer.execute(
+		const msgParamsTokenTransfer = await createMessageParam(
+			messageTokenTransfer,
+			relayer.address
+		)
+		const signatureTokenTransfer = signTypedMessage(
+			toBuffer(userWallet.privateKey),
 			{
-				from: message3.from,
-				to: message3.to,
-				value: message3.value,
-				gas: message3.gas,
-				nonce: message3.nonce,
-				expiry: message3.expiry,
-				data: message3.data,
-			},
-			signature3
+				data: msgParamsTokenTransfer,
+			}
 		)
+
+		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
+		expect(userEthBalance.toString()).to.equal('0')
+		const userTokenBalance = await token.balanceOf(userWallet.address)
+		expect(userTokenBalance.toString()).to.equal('10' + BALANCE_SUFFIX)
+		const companyTokenBalance = await token.balanceOf(companyWallet.address)
+		expect(companyTokenBalance.toString()).to.equal('0')
+
+		// Nft mint
+		const mintRole = await nft.MINT_ROLE()
+		await nft.grantRole(mintRole, minterWallet.address)
+
+		const ifaceNftMint = new ethers.utils.Interface([
+			'mint(address to, uint256 tokenId)',
+		])
+		const functionEncodedNftMint = ifaceNftMint.encodeFunctionData('mint', [
+			userWallet.address,
+			1,
+		])
+		const minterNonce: BigNumber = await relayer.getNonce(minterWallet.address)
+		const messageNftMint = await createMessage(
+			minterWallet.address,
+			nft.address,
+			0,
+			100000000,
+			minterNonce.toNumber(),
+			functionEncodedNftMint
+		)
+		const msgParamsNftMint = await createMessageParam(
+			messageNftMint,
+			relayer.address
+		)
+		const signatureNftMint = signTypedMessage(
+			toBuffer(minterWallet.privateKey),
+			{
+				data: msgParamsNftMint,
+			}
+		)
+
+		const userNftBalance = await nft.balanceOf(userWallet.address)
+		expect(userNftBalance.toString()).to.equal('0')
+
+		// Const userWallet = Wallet.createRandom()
+		// const arg1Wallet = Wallet.createRandom()
+		// const arg2Wallet = Wallet.createRandom()
+		// const arg3 = 192836
+		// await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
+		// const iface = new ethers.utils.Interface([
+		// 	'function testFunc(address _arg1, address _arg2, uint256 _arg3)',
+		// ])
+		// const functionSignature = iface.encodeFunctionData('testFunc', [
+		// 	arg1Wallet.address,
+		// 	arg2Wallet.address,
+		// 	arg3,
+		// ])
+		// const nonce: BigNumber = await relayer.getNonce(userWallet.address)
+
+		// const message = await createMessage(
+		// 	userWallet.address,
+		// 	target.address,
+		// 	0,
+		// 	10000000,
+		// 	nonce.add(1).toNumber(),
+		// 	functionSignature
+		// )
+
+		// const msgParams = await createMessageParam(message, relayer.address)
+		// const signature = signTypedMessage(toBuffer(userWallet.privateKey), {
+		// 	data: msgParams,
+		// })
+		// const message2 = await createMessage(
+		// 	userWallet.address,
+		// 	target.address,
+		// 	0,
+		// 	10000000,
+		// 	nonce.add(2).toNumber(),
+		// 	functionSignature
+		// )
+		// const msgParams2 = await createMessageParam(message2, relayer.address)
+		// const signature2 = signTypedMessage(toBuffer(userWallet.privateKey), {
+		// 	data: msgParams2,
+		// })
+
+		// const iface3 = new ethers.utils.Interface([
+		// 	'function batch(tuple(address from, address to, uint256 value, uint256 gas, uint256 nonce, uint256 expiry, bytes data)[] reqs, bytes[] signatures)',
+		// ])
+		// const functionSignature3 = iface3.encodeFunctionData('batch', [
+		// 	[
+		// 		{
+		// 			from: message.from,
+		// 			to: message.to,
+		// 			value: message.value,
+		// 			gas: message.gas,
+		// 			nonce: message.nonce,
+		// 			expiry: message.expiry,
+		// 			data: message.data,
+		// 		},
+		// 		{
+		// 			from: message2.from,
+		// 			to: message2.to,
+		// 			value: message2.value,
+		// 			gas: message2.gas,
+		// 			nonce: message2.nonce,
+		// 			expiry: message2.expiry,
+		// 			data: message2.data,
+		// 		},
+		// 	],
+		// 	[signature, signature2],
+		// ])
+		// const message3 = await createMessage(
+		// 	userWallet.address,
+		// 	relayer.address,
+		// 	0,
+		// 	100000000,
+		// 	nonce.toNumber(),
+		// 	functionSignature3
+		// )
+		// const msgParams3 = await createMessageParam(message3, relayer.address)
+		// const signature3 = signTypedMessage(toBuffer(userWallet.privateKey), {
+		// 	data: msgParams3,
+		// })
+		// await relayer.execute(
+		// 	{
+		// 		from: message3.from,
+		// 		to: message3.to,
+		// 		value: message3.value,
+		// 		gas: message3.gas,
+		// 		nonce: message3.nonce,
+		// 		expiry: message3.expiry,
+		// 		data: message3.data,
+		// 	},
+		// 	signature3
+		// )
 	})
 })
