@@ -4,7 +4,11 @@
 /* eslint-disable new-cap */
 /* eslint-disable max-params */
 
-import { signTypedMessage, TypedMessage } from 'eth-sig-util'
+import {
+	signTypedData,
+	TypedMessage,
+	SignTypedDataVersion,
+} from '@metamask/eth-sig-util'
 import { toBuffer } from 'ethereumjs-util'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
@@ -149,7 +153,7 @@ describe('ForwarderUpgradeable', () => {
 	afterEach(async () => {
 		await resetChain(snapshot)
 	})
-	it.only('erc20 transfer', async () => {
+	it('erc20 transfer', async () => {
 		const userWallet = Wallet.createRandom()
 		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
 		const companyWallet = Wallet.createRandom()
@@ -170,10 +174,11 @@ describe('ForwarderUpgradeable', () => {
 			functionEncoded
 		)
 		const msgParams = await createMessageParam(message, relayer.address)
-		const signature = signTypedMessage(toBuffer(userWallet.privateKey), {
+		const signature = signTypedData({
+			privateKey: toBuffer(userWallet.privateKey),
 			data: msgParams,
+			version: SignTypedDataVersion.V4,
 		})
-
 		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
 		expect(userEthBalance.toString()).to.equal('0')
 		const userTokenBalance = await token.balanceOf(userWallet.address)
@@ -203,7 +208,7 @@ describe('ForwarderUpgradeable', () => {
 		)
 		expect(companyTokenBalanceAfter.toString()).to.equal('10' + BALANCE_SUFFIX)
 	})
-	it.only('pay token and mint nft', async () => {
+	it('pay token and mint nft', async () => {
 		// 登場人物
 		const userWallet = Wallet.createRandom()
 		const companyWallet = Wallet.createRandom()
@@ -232,12 +237,11 @@ describe('ForwarderUpgradeable', () => {
 			messageTokenTransfer,
 			relayer.address
 		)
-		const signatureTokenTransfer = signTypedMessage(
-			toBuffer(userWallet.privateKey),
-			{
-				data: msgParamsTokenTransfer,
-			}
-		)
+		const signatureTokenTransfer = signTypedData({
+			privateKey: toBuffer(userWallet.privateKey),
+			data: msgParamsTokenTransfer,
+			version: SignTypedDataVersion.V4,
+		})
 
 		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
 		expect(userEthBalance.toString()).to.equal('0')
@@ -269,12 +273,12 @@ describe('ForwarderUpgradeable', () => {
 			messageNftMint,
 			relayer.address
 		)
-		const signatureNftMint = signTypedMessage(
-			toBuffer(minterWallet.privateKey),
-			{
-				data: msgParamsNftMint,
-			}
-		)
+
+		const signatureNftMint = signTypedData({
+			privateKey: toBuffer(minterWallet.privateKey),
+			data: msgParamsNftMint,
+			version: SignTypedDataVersion.V4,
+		})
 
 		const userNftBalance = await nft.balanceOf(userWallet.address)
 		expect(userNftBalance.toString()).to.equal('0')
@@ -319,9 +323,13 @@ describe('ForwarderUpgradeable', () => {
 			messageBatch,
 			relayer.address
 		)
-		const signatureBatch = signTypedMessage(toBuffer(batchWallet.privateKey), {
+
+		const signatureBatch = signTypedData({
+			privateKey: toBuffer(batchWallet.privateKey),
 			data: msgParamsBatch,
+			version: SignTypedDataVersion.V4,
 		})
+
 		await relayer.execute(
 			{
 				from: messageBatch.from,

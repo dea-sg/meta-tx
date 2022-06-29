@@ -37,6 +37,7 @@
 		"@types/node": "16.11.41",
 		"@typescript-eslint/eslint-plugin": "5.30.0",
 		"@typescript-eslint/parser": "5.30.0",
+		"@metamask/eth-sig-util": "4.0.1",
 		"chai": "4.3.6",
 		"del-cli": "4.0.1",
 		"dotenv": "16.0.1",
