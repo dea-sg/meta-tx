@@ -68,6 +68,11 @@ After deploying, do not forget to execute initialize function.
 await example.initialize(forwarder.address)
 ```
 
+Deploy a contract (ForwarderUpgradeable) that executes the metatransaction.
+Execute initialize and set the name and version.
+The name and version are required for EIP712 authentication.
+You can see how to execute the metatransaction in forward.ts.
+
 ## For Developers
 
 The development environment can be created by executing the following commands.

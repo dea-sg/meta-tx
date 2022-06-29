@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgra
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 
+// see: https://github.com/wighawag/singleton-1776-meta-transaction/blob/master/contracts/src/GenericMetaTxProcessor.sol
 contract ForwarderUpgradeable is
 	Initializable,
 	EIP712Upgradeable,
