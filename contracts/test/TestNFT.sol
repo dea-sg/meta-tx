@@ -13,9 +13,9 @@ contract TestNFT is
 	bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
 
 	function initialize(address _forwarderAccessControl) public initializer {
+		__MetaTxContext_init(_forwarderAccessControl);
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
 		__ERC721_init("token", "TOKEN");
-		__MetaTxContext_init(_forwarderAccessControl);
 		__AccessControlEnumerable_init();
 	}
 

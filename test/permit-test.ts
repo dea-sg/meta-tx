@@ -11,7 +11,7 @@ import { signTypedMessage, TypedMessage } from 'eth-sig-util'
 import { toBuffer, fromRpcSig } from 'ethereumjs-util'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { Contract, constants, Wallet } from 'ethers'
+import { Contract, Wallet } from 'ethers'
 
 interface MessageTypeProperty {
 	name: string

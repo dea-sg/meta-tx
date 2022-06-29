@@ -122,7 +122,7 @@ contract ForwarderUpgradeable is
 	{
 		require(!lock, "in progress");
 		lock = true;
-		(_success, _returndata) = innerExecute(_req, _signature);
+		(_success, _returndata) = this.innerExecute(_req, _signature);
 		lock = false;
 		return (_success, _returndata);
 	}
@@ -130,12 +130,9 @@ contract ForwarderUpgradeable is
 	function innerExecute(
 		ForwardRequest calldata _req,
 		bytes calldata _signature
-	)
-		public
-		payable
-		onlyExecuter
-		returns (bool _success, bytes memory _returndata)
-	{
+	) external payable returns (bool _success, bytes memory _returndata) {
+		// "internal" and "private" functions cannot be payable.
+		require(msg.sender == address(this), "inner execute only");
 		require(verify(_req, _signature), "signature does not match request");
 		nonces[_req.from] = _req.nonce + 1;
 		// solhint-disable-next-line avoid-low-level-calls
@@ -175,7 +172,7 @@ contract ForwarderUpgradeable is
 		require(batchLock == false, "batch processing");
 		batchLock = true;
 		for (uint256 i = 0; i < _reqs.length; i++) {
-			innerExecute(_reqs[i], _signatures[i]);
+			this.innerExecute(_reqs[i], _signatures[i]);
 		}
 		batchLock = false;
 	}
