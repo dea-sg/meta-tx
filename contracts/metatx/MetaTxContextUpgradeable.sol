@@ -12,27 +12,23 @@ abstract contract MetaTxContextUpgradeable is
 	Initializable,
 	ContextUpgradeable
 {
-	address public forwarderAccessControl;
+	address public control;
 
 	// solhint-disable-next-line func-name-mixedcase
-	function __MetaTxContext_init(address _forwarderAccessControl)
-		internal
-		onlyInitializing
-	{
+	function __MetaTxContext_init(address _control) internal onlyInitializing {
 		__Context_init();
-		forwarderAccessControl = _forwarderAccessControl;
+		control = _control;
 	}
 
-	function setForwarderAccessControl(address _forwarderAccessControl)
-		internal
-	{
-		forwarderAccessControl = _forwarderAccessControl;
+	function setForwarderAccessControl(address _control) internal {
+		control = _control;
 	}
 
 	function isTrustedForwarder(address _forwarder) public view returns (bool) {
 		return
-			IForwarderAccessControlUpgradeable(forwarderAccessControl)
-				.isTrustedForwarder(_forwarder);
+			IForwarderAccessControlUpgradeable(control).isTrustedForwarder(
+				_forwarder
+			);
 	}
 
 	function _msgSender()

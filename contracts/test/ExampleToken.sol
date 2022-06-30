@@ -7,9 +7,9 @@ import "../metatx/MetaTxContextUpgradeable.sol";
 contract ExampleToken is ERC20Upgradeable, MetaTxContextUpgradeable {
 	bytes public currentData;
 
-	function initialize(address _forwarderAccessControl) public initializer {
+	function initialize(address _control) public initializer {
 		__ERC20_init("token", "TOKEN");
-		__MetaTxContext_init(_forwarderAccessControl);
+		__MetaTxContext_init(_control);
 		_mint(msg.sender, 100000000000000000000);
 	}
 

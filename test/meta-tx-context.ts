@@ -39,10 +39,10 @@ describe('MinimalMetaTxContextUpgradeable', () => {
 	})
 	describe('setForwarderAccessControl', () => {
 		it('set address', async () => {
-			expect(await minimal.forwarderAccessControl()).to.equal(control.address)
+			expect(await minimal.control()).to.equal(control.address)
 			const tmp = Wallet.createRandom()
 			await minimal.setForwarderAccessControlTest(tmp.address)
-			expect(await minimal.forwarderAccessControl()).to.equal(tmp.address)
+			expect(await minimal.control()).to.equal(tmp.address)
 		})
 	})
 	describe('isTrustedForwarder', () => {

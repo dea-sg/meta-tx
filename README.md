@@ -13,6 +13,13 @@ or
 npm install @dea-sg/meta-tx
 ```
 
+After deploying ForwarderUpgradeable with proxy(uups), the deployer should execute the following function.
+name and version are required for authentication.You can refer to test/forward.ts to find out.
+
+```
+await forwarder.initialize('forwarder', '1.0.0')
+```
+
 After deploying ForwarderAccessControlUpgradeable with proxy(uups), the deployer should execute the following function.
 Set the forwarder address to the address of the contract executing the metatransaction.
 
@@ -20,7 +27,7 @@ Set the forwarder address to the address of the contract executing the metatrans
 await control.initialize()
 const forwarderRole = await control.FORWARDER_ROLE()
 await control.grantRole(forwarderRole, {forwarder address})
-const hasRole = await control.isTrustedForwarder(foo.address)
+const hasRole = await control.isTrustedForwarder({forwarder address})
 console.log(hasRole)
 >> True
 ```
@@ -37,9 +44,9 @@ contract ExampleToken is
 	MetaTxContextUpgradeable
 {
 	bytes public currentData;
-	function initialize(address _forwarder) public initializer {
+	function initialize(address _control) public initializer {
 		__ERC20_init("token", "TOKEN");
-		__MetaTxContextUpgradeable_init(_forwarder);
+		__MetaTxContextUpgradeable_init(_control);
 	}
 
 	function _msgSender()
@@ -65,13 +72,10 @@ contract ExampleToken is
 After deploying, do not forget to execute initialize function.
 
 ```
-await example.initialize(forwarder.address)
+await example.initialize(control.address)
 ```
 
-Deploy a contract (ForwarderUpgradeable) that executes the metatransaction.
-Execute initialize and set the name and version.
-The name and version are required for EIP712 authentication.
-You can see how to execute the metatransaction in forward.ts.
+You can see how to execute the metatransaction in test/forward.ts.
 
 ## For Developers
 
