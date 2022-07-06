@@ -74,6 +74,7 @@ contract ForwarderUpgradeable is
 		return (_success, _returndata);
 	}
 
+	// EIP-1776
 	function batch(
 		ForwardRequest[] calldata _reqs,
 		bytes[] calldata _signatures
