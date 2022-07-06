@@ -32,7 +32,7 @@ interface MessageTypes {
 const BALANCE_SUFFIX = '000000000000000000'
 
 describe('ForwarderUpgradeable', () => {
-	let relayer: ForwarderUpgradeable
+	let forwarder: ForwarderUpgradeable
 	let control: ForwarderAccessControlUpgradeable
 	let token: ExampleToken
 	let nft: TestNFT
@@ -70,7 +70,7 @@ describe('ForwarderUpgradeable', () => {
 
 	const createMessageParam = async (
 		message: Message,
-		relayerAddress: string
+		forwarderAddress: string
 	): Promise<TypedMessage<MessageTypes>> => {
 		const chainId = await getChainId()
 		return {
@@ -96,10 +96,41 @@ describe('ForwarderUpgradeable', () => {
 				name: 'Forwarder',
 				version: '0.0.1',
 				chainId,
-				verifyingContract: relayerAddress,
+				verifyingContract: forwarderAddress,
 			},
 			message,
 		} as TypedMessage<MessageTypes>
+	}
+
+	const transferPrepare = async (): Promise<
+		[Wallet, Wallet, Message, string]
+	> => {
+		const userWallet = Wallet.createRandom()
+		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
+		const companyWallet = Wallet.createRandom()
+		const iface = new ethers.utils.Interface([
+			'function transfer(address to, uint256 amount)',
+		])
+		const functionEncoded = iface.encodeFunctionData('transfer', [
+			companyWallet.address,
+			'10' + BALANCE_SUFFIX,
+		])
+		const nonce: BigNumber = await forwarder.getNonce(userWallet.address)
+		const message = await createMessage(
+			userWallet.address,
+			token.address,
+			0,
+			100000000,
+			nonce.toNumber(),
+			functionEncoded
+		)
+		const msgParams = await createMessageParam(message, forwarder.address)
+		const signature = signTypedData({
+			privateKey: toBuffer(userWallet.privateKey),
+			data: msgParams,
+			version: SignTypedDataVersion.V4,
+		})
+		return [userWallet, companyWallet, message, signature]
 	}
 
 	const getChainId = async (): Promise<number> => {
@@ -132,15 +163,15 @@ describe('ForwarderUpgradeable', () => {
 		const forwarderFactory = await ethers.getContractFactory(
 			'ForwarderUpgradeable'
 		)
-		relayer = (await forwarderFactory.deploy()) as ForwarderUpgradeable
-		await relayer.deployed()
-		await relayer.initialize('Forwarder', '0.0.1')
-		const executeRole = await relayer.EXECUTE_ROLE()
+		forwarder = (await forwarderFactory.deploy()) as ForwarderUpgradeable
+		await forwarder.deployed()
+		await forwarder.initialize('Forwarder', '0.0.1')
+		const executeRole = await forwarder.EXECUTE_ROLE()
 
-		await relayer.grantRole(executeRole, signer.address)
+		await forwarder.grantRole(executeRole, signer.address)
 
 		const forwarderRole = await control.FORWARDER_ROLE()
-		await control.grantRole(forwarderRole, relayer.address)
+		await control.grantRole(forwarderRole, forwarder.address)
 
 		const testNFTFactory = await ethers.getContractFactory('TestNFT')
 		nft = (await testNFTFactory.deploy()) as TestNFT
@@ -153,39 +184,100 @@ describe('ForwarderUpgradeable', () => {
 	afterEach(async () => {
 		await resetChain(snapshot)
 	})
-	it('erc20 transfer', async () => {
-		const userWallet = Wallet.createRandom()
-		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
-		const companyWallet = Wallet.createRandom()
-		const iface = new ethers.utils.Interface([
-			'function transfer(address to, uint256 amount)',
-		])
-		const functionEncoded = iface.encodeFunctionData('transfer', [
-			companyWallet.address,
-			'10' + BALANCE_SUFFIX,
-		])
-		const nonce: BigNumber = await relayer.getNonce(userWallet.address)
-		const message = await createMessage(
-			userWallet.address,
-			token.address,
-			0,
-			100000000,
-			nonce.toNumber(),
-			functionEncoded
-		)
-		const msgParams = await createMessageParam(message, relayer.address)
-		const signature = signTypedData({
-			privateKey: toBuffer(userWallet.privateKey),
-			data: msgParams,
-			version: SignTypedDataVersion.V4,
+	describe('initialize', () => {
+		describe('fail', () => {
+			it('Cannot be executed more than once', async () => {
+				await expect(
+					forwarder.initialize('Forwarder', '0.0.1')
+				).to.be.revertedWith('Initializable: contract is already initialized')
+			})
 		})
+	})
+	describe('getNonce', () => {
+		describe('success', () => {
+			it('default nonce is 0', async () => {
+				const userWallet = Wallet.createRandom()
+				const nonce: BigNumber = await forwarder.getNonce(userWallet.address)
+				expect(nonce.toString()).to.equal('0')
+			})
+			it('incriment nonce', async () => {
+				const [userWallet, , message, signature] = await transferPrepare()
+				const nonce: BigNumber = await forwarder.getNonce(userWallet.address)
+				expect(nonce.toString()).to.equal('0')
+				await forwarder.execute(
+					{
+						from: message.from,
+						to: message.to,
+						value: message.value,
+						gas: message.gas,
+						nonce: message.nonce,
+						expiry: message.expiry,
+						data: message.data,
+					},
+					signature
+				)
+				const nonceNext: BigNumber = await forwarder.getNonce(
+					userWallet.address
+				)
+				expect(nonceNext.toString()).to.equal('1')
+			})
+		})
+	})
+
+	describe('pause', () => {
+		describe('success', () => {
+			it('revoke execute role', async () => {
+				const executeRole = await forwarder.EXECUTE_ROLE()
+				await forwarder.pause()
+				const [admin] = await ethers.getSigners()
+				const hasExecuteRole = await forwarder.hasRole(
+					executeRole,
+					admin.address
+				)
+				expect(hasExecuteRole).to.equal(false)
+				const adminRole = await forwarder.DEFAULT_ADMIN_ROLE()
+				const hasAdminRole = await forwarder.hasRole(adminRole, admin.address)
+				expect(hasAdminRole).to.equal(true)
+			})
+			it('revoke execute role or all executer', async () => {
+				const [admin, user] = await ethers.getSigners()
+				const executeRole = await forwarder.EXECUTE_ROLE()
+				await forwarder.grantRole(executeRole, user.address)
+				let hasExecuteRole = await forwarder.hasRole(executeRole, admin.address)
+				expect(hasExecuteRole).to.equal(true)
+				hasExecuteRole = await forwarder.hasRole(executeRole, user.address)
+				expect(hasExecuteRole).to.equal(true)
+				await forwarder.pause()
+				hasExecuteRole = await forwarder.hasRole(executeRole, admin.address)
+				expect(hasExecuteRole).to.equal(false)
+				hasExecuteRole = await forwarder.hasRole(executeRole, user.address)
+				expect(hasExecuteRole).to.equal(false)
+			})
+		})
+		describe('fail', () => {
+			it('admin only', async () => {
+				const [, user] = await ethers.getSigners()
+				const forwarderUser = forwarder.connect(user)
+				const errorMsg = `AccessControl: account ${user.address.toLowerCase()} is missing role 0x0000000000000000000000000000000000000000000000000000000000000000`
+				await expect(forwarderUser.pause()).to.be.revertedWith(errorMsg)
+			})
+		})
+	})
+
+	it('erc20 transfer', async () => {
+		const [kicker] = await ethers.getSigners()
+		const [userWallet, companyWallet, message, signature] =
+			await transferPrepare()
 		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
+		expect(userEthBalance.toString()).to.equal('0')
 		expect(userEthBalance.toString()).to.equal('0')
 		const userTokenBalance = await token.balanceOf(userWallet.address)
 		expect(userTokenBalance.toString()).to.equal('10' + BALANCE_SUFFIX)
 		const companyTokenBalance = await token.balanceOf(companyWallet.address)
 		expect(companyTokenBalance.toString()).to.equal('0')
-		await relayer.execute(
+		const kickerEthbalance = await ethers.provider.getBalance(kicker.address)
+
+		await forwarder.execute(
 			{
 				from: message.from,
 				to: message.to,
@@ -207,41 +299,22 @@ describe('ForwarderUpgradeable', () => {
 			companyWallet.address
 		)
 		expect(companyTokenBalanceAfter.toString()).to.equal('10' + BALANCE_SUFFIX)
+		const kickerEthbalanceAfter = await ethers.provider.getBalance(
+			kicker.address
+		)
+		const usedGas = kickerEthbalance.sub(kickerEthbalanceAfter)
+		expect(usedGas.gt(0)).to.equal(true)
 	})
 	it('pay token and mint nft', async () => {
-		// 登場人物
-		const userWallet = Wallet.createRandom()
-		const companyWallet = Wallet.createRandom()
+		const [kicker] = await ethers.getSigners()
 		const minterWallet = Wallet.createRandom()
 		const batchWallet = Wallet.createRandom()
-
-		// Token transfer
-		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
-		const ifaceTokenTransfer = new ethers.utils.Interface([
-			'function transfer(address to, uint256 amount)',
-		])
-		const functionEncodedTokenTransfer = ifaceTokenTransfer.encodeFunctionData(
-			'transfer',
-			[companyWallet.address, '10' + BALANCE_SUFFIX]
-		)
-		const userNonce = await relayer.getNonce(userWallet.address)
-		const messageTokenTransfer = await createMessage(
-			userWallet.address,
-			token.address,
-			0,
-			100000000,
-			userNonce.toNumber(),
-			functionEncodedTokenTransfer
-		)
-		const msgParamsTokenTransfer = await createMessageParam(
+		const [
+			userWallet,
+			companyWallet,
 			messageTokenTransfer,
-			relayer.address
-		)
-		const signatureTokenTransfer = signTypedData({
-			privateKey: toBuffer(userWallet.privateKey),
-			data: msgParamsTokenTransfer,
-			version: SignTypedDataVersion.V4,
-		})
+			signatureTokenTransfer,
+		] = await transferPrepare()
 
 		const userEthBalance = await ethers.provider.getBalance(userWallet.address)
 		expect(userEthBalance.toString()).to.equal('0')
@@ -260,7 +333,7 @@ describe('ForwarderUpgradeable', () => {
 			userWallet.address,
 			1,
 		])
-		const minterNonce = await relayer.getNonce(minterWallet.address)
+		const minterNonce = await forwarder.getNonce(minterWallet.address)
 		const messageNftMint = await createMessage(
 			minterWallet.address,
 			nft.address,
@@ -271,7 +344,7 @@ describe('ForwarderUpgradeable', () => {
 		)
 		const msgParamsNftMint = await createMessageParam(
 			messageNftMint,
-			relayer.address
+			forwarder.address
 		)
 
 		const signatureNftMint = signTypedData({
@@ -310,10 +383,10 @@ describe('ForwarderUpgradeable', () => {
 			],
 			[signatureTokenTransfer, signatureNftMint],
 		])
-		const batchNonce = await relayer.getNonce(batchWallet.address)
+		const batchNonce = await forwarder.getNonce(batchWallet.address)
 		const messageBatch = await createMessage(
 			batchWallet.address,
-			relayer.address,
+			forwarder.address,
 			0,
 			100000000,
 			batchNonce.toNumber(),
@@ -321,7 +394,7 @@ describe('ForwarderUpgradeable', () => {
 		)
 		const msgParamsBatch = await createMessageParam(
 			messageBatch,
-			relayer.address
+			forwarder.address
 		)
 
 		const signatureBatch = signTypedData({
@@ -329,8 +402,8 @@ describe('ForwarderUpgradeable', () => {
 			data: msgParamsBatch,
 			version: SignTypedDataVersion.V4,
 		})
-
-		await relayer.execute(
+		const kickerEthbalance = await ethers.provider.getBalance(kicker.address)
+		await forwarder.execute(
 			{
 				from: messageBatch.from,
 				to: messageBatch.to,
@@ -352,5 +425,10 @@ describe('ForwarderUpgradeable', () => {
 		expect(userNftBalanceAfter.toString()).to.equal('1')
 		const owner = await nft.ownerOf(1)
 		expect(owner).to.equal(userWallet.address)
+		const kickerEthbalanceAfter = await ethers.provider.getBalance(
+			kicker.address
+		)
+		const usedGas = kickerEthbalance.sub(kickerEthbalanceAfter)
+		expect(usedGas.gt(0)).to.equal(true)
 	})
 })

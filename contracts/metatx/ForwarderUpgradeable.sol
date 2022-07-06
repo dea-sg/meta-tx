@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-upgradeable/utils/cryptography/draft-EIP712Upgra
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlEnumerableUpgradeable.sol";
 
-// see: https://github.com/wighawag/singleton-1776-meta-transaction/blob/master/contracts/src/GenericMetaTxProcessor.sol
 contract ForwarderUpgradeable is
 	UUPSUpgradeable,
 	EIP712Upgradeable,
@@ -19,7 +18,7 @@ contract ForwarderUpgradeable is
 		uint256 value;
 		uint256 gas;
 		uint256 nonce;
-		uint256 expiry;
+		uint256 expiry; // EIP-1776
 		bytes data;
 	}
 	event MetaTransaction(
@@ -128,10 +127,15 @@ contract ForwarderUpgradeable is
 
 	function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
 		uint256 cnt = getRoleMemberCount(EXECUTE_ROLE);
+		address[] memory targets = new address[](cnt);
+
 		for (uint256 i = 0; i < cnt; i++) {
-			address account = getRoleMember(EXECUTE_ROLE, i);
-			revokeRole(EXECUTE_ROLE, account);
+			targets[i] = getRoleMember(EXECUTE_ROLE, i);
 		}
+		for (uint256 i = 0; i < cnt; i++) {
+			revokeRole(EXECUTE_ROLE, targets[i]);
+		}
+
 		cnt = getRoleMemberCount(EXECUTE_ROLE);
 		require(cnt == 0, "not pause");
 	}
