@@ -12,13 +12,15 @@ contract ForwarderUpgradeable is
 	AccessControlEnumerableUpgradeable
 {
 	using ECDSAUpgradeable for bytes32;
+
 	struct ForwardRequest {
 		address from;
 		address to;
 		uint256 value;
 		uint256 gas;
 		uint256 nonce;
-		uint256 expiry; // EIP-1776
+		// EIP-1776
+		uint256 expiry;
 		bytes data;
 	}
 	event MetaTransaction(
@@ -64,7 +66,7 @@ contract ForwarderUpgradeable is
 	function execute(ForwardRequest calldata _req, bytes calldata _signature)
 		external
 		payable
-		onlyRole(EXECUTE_ROLE)
+		onlyRole(EXECUTE_ROLE) // Cannot call execute from execute
 		returns (bool _success, bytes memory _returndata)
 	{
 		require(!lock, "in progress");
@@ -79,8 +81,8 @@ contract ForwarderUpgradeable is
 		ForwardRequest[] calldata _reqs,
 		bytes[] calldata _signatures
 	) external payable {
-		require(msg.sender == address(this), "inner execute only");
 		require(_reqs.length == _signatures.length, "illegal params");
+		require(msg.sender == address(this), "inner execute only");
 		require(batchLock == false, "in batch progress");
 		batchLock = true;
 		for (uint256 i = 0; i < _reqs.length; i++) {
@@ -156,7 +158,9 @@ contract ForwarderUpgradeable is
 		);
 		// solhint-disable-next-line not-rely-on-time
 		require(block.timestamp < _req.expiry, "expired"); //EIP-1681
-		return nonces[_req.from] == _req.nonce && signer == _req.from;
+		require(nonces[_req.from] == _req.nonce, "illegal nonce");
+		require(signer == _req.from, "illegal signer");
+		return true;
 	}
 
 	function makeHashFromParam(ForwardRequest calldata _req)
