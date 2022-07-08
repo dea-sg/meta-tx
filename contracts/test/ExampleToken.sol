@@ -6,6 +6,7 @@ import "../metatx/MetaTxContextUpgradeable.sol";
 
 contract ExampleToken is ERC20Upgradeable, MetaTxContextUpgradeable {
 	bytes public currentData;
+	uint256 public latestPay;
 
 	function initialize(address _control) public initializer {
 		__ERC20_init("token", "TOKEN");
@@ -37,5 +38,9 @@ contract ExampleToken is ERC20Upgradeable, MetaTxContextUpgradeable {
 
 	function saveCurrentMsgData() external {
 		currentData = _msgData();
+	}
+
+	function payableFunc() external payable {
+		latestPay = msg.value;
 	}
 }

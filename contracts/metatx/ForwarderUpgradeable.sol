@@ -81,9 +81,10 @@ contract ForwarderUpgradeable is
 		ForwardRequest[] calldata _reqs,
 		bytes[] calldata _signatures
 	) external payable {
-		require(_reqs.length == _signatures.length, "illegal params");
-		require(msg.sender == address(this), "inner execute only");
 		require(batchLock == false, "in batch progress");
+		require(_reqs.length == _signatures.length, "illegal params");
+		require(_reqs.length != 0, "request does not exist");
+		require(msg.sender == address(this), "inner execute only");
 		batchLock = true;
 		for (uint256 i = 0; i < _reqs.length; i++) {
 			innerExecute(_reqs[i], _signatures[i]);

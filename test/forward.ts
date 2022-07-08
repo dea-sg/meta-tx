@@ -10,8 +10,10 @@ import {
 	SignTypedDataVersion,
 } from '@metamask/eth-sig-util'
 import { toBuffer } from 'ethereumjs-util'
-import { expect } from 'chai'
+import { expect, use } from 'chai'
 import { ethers } from 'hardhat'
+import { solidity } from 'ethereum-waffle'
+import * as t from 'chai-as-promised'
 import { Wallet, BigNumber } from 'ethers'
 import { makeSnapshot, resetChain } from './utils'
 import {
@@ -20,6 +22,9 @@ import {
 	ExampleToken,
 	TestNFT,
 } from '../typechain-types'
+
+use(solidity)
+use(t.default)
 
 interface MessageTypeProperty {
 	name: string
@@ -100,10 +105,12 @@ describe('ForwarderUpgradeable', () => {
 		} as TypedMessage<MessageTypes>
 	}
 
-	const transferPrepare = async (
+	const basicPrepare = async (
 		_nonce = -1,
 		_expiry = -1,
-		_value = 0
+		_value = 0,
+		_functionEncoded = '',
+		_gas = 0
 	): Promise<[Wallet, Wallet, Message, string]> => {
 		const createTransferFuncEncoded = (): string => {
 			const iface = new ethers.utils.Interface([
@@ -119,17 +126,19 @@ describe('ForwarderUpgradeable', () => {
 		const userWallet = Wallet.createRandom()
 		await token.transfer(userWallet.address, '10' + BALANCE_SUFFIX)
 		const companyWallet = Wallet.createRandom()
-		const functionEncoded = createTransferFuncEncoded()
+		const functionEncoded =
+			_functionEncoded === '' ? createTransferFuncEncoded() : _functionEncoded
 		const nonce: BigNumber =
 			_nonce === -1
 				? await forwarder.getNonce(userWallet.address)
 				: BigNumber.from(_nonce)
 		const expiry = _expiry === -1 ? await getDeadLine() : _expiry
+		const gas = _gas === 0 ? 100000000 : _gas
 		const message = createMessage(
 			userWallet.address,
 			token.address,
 			_value,
-			100000000,
+			gas,
 			nonce.toNumber(),
 			expiry,
 			functionEncoded
@@ -252,7 +261,7 @@ describe('ForwarderUpgradeable', () => {
 				expect(nonce.toString()).to.equal('0')
 			})
 			it('incriment nonce', async () => {
-				const [userWallet, , message, signature] = await transferPrepare()
+				const [userWallet, , message, signature] = await basicPrepare()
 				const nonce: BigNumber = await forwarder.getNonce(userWallet.address)
 				expect(nonce.toString()).to.equal('0')
 				await forwarder.execute(
@@ -321,7 +330,7 @@ describe('ForwarderUpgradeable', () => {
 			it('erc20 transfer', async () => {
 				const [kicker] = await ethers.getSigners()
 				const [userWallet, companyWallet, message, signature] =
-					await transferPrepare()
+					await basicPrepare()
 				const userEthBalance = await ethers.provider.getBalance(
 					userWallet.address
 				)
@@ -366,7 +375,7 @@ describe('ForwarderUpgradeable', () => {
 				expect(usedGas.gt(0)).to.equal(true)
 			})
 			it('increment nonce', async () => {
-				const [userWallet, , message, signature] = await transferPrepare()
+				const [userWallet, , message, signature] = await basicPrepare()
 
 				await forwarder.execute(
 					{
@@ -384,45 +393,36 @@ describe('ForwarderUpgradeable', () => {
 				expect(nonce.toString()).to.equal('1')
 			})
 			it('send value', async () => {
-				// Const iface = new ethers.utils.Interface([
-				// 	'function payableFunc()',
-				// ])
-				// const functionEncoded = iface.encodeFunctionData('payableFunc', [])
-				// console.log(functionEncoded)
-				// const [, , message, signature] = await transferPrepare(-1, -1, 1000000000, '0x')
-				// const [kicker] = await ethers.getSigners()
-				// const tx = {
-				// 	to: message.from,
-				// 	value: BigNumber.from(1000000000)
-				// }
-				// await kicker.sendTransaction(tx)
-				// const fromBalance = await ethers.provider.getBalance(message.from)
-				// expect(fromBalance.toString()).to.equal('1000000000')
-				// const toBalance = await ethers.provider.getBalance(message.to)
-				// expect(toBalance.toString()).to.equal('0')
-				// console.log(message)
-				// console.log(message.data)
-				// await forwarder.execute(
-				// 	{
-				// 		from: message.from,
-				// 		to: message.to,
-				// 		value: message.value,
-				// 		gas: message.gas,
-				// 		nonce: message.nonce,
-				// 		expiry: message.expiry,
-				// 		data: message.data,
-				// 	},
-				// 	signature
-				// )
-				// console.log(2222)
-				// const fromBalanceAfter = await ethers.provider.getBalance(message.from)
-				// expect(fromBalanceAfter.toString()).to.equal('0')
-				// console.log(3333)
-				// const toBalanceAfter = await ethers.provider.getBalance(message.to)
-				// expect(toBalanceAfter.toString()).to.equal('10')
+				const iface = new ethers.utils.Interface(['function payableFunc()'])
+				const functionEncoded = iface.encodeFunctionData('payableFunc', [])
+				const sendValue = 1000000000
+				const [, , message, signature] = await basicPrepare(
+					-1,
+					-1,
+					sendValue,
+					functionEncoded
+				)
+				const toBalance = await ethers.provider.getBalance(message.to)
+				expect(toBalance.toString()).to.equal('0')
+				const options = { value: ethers.utils.parseEther('1.0') }
+				await forwarder.execute(
+					{
+						from: message.from,
+						to: message.to,
+						value: message.value,
+						gas: message.gas,
+						nonce: message.nonce,
+						expiry: message.expiry,
+						data: message.data,
+					},
+					signature,
+					options
+				)
+				const toBalanceAfter = await ethers.provider.getBalance(message.to)
+				expect(toBalanceAfter.toNumber()).to.equal(sendValue)
 			})
 			it('generate event', async () => {
-				const [, , message, signature] = await transferPrepare()
+				const [, , message, signature] = await basicPrepare()
 				await forwarder.execute(
 					{
 						from: message.from,
@@ -455,7 +455,7 @@ describe('ForwarderUpgradeable', () => {
 		describe('fail', () => {
 			it('has no execute role', async () => {
 				const [, user] = await ethers.getSigners()
-				const [, , message, signature] = await transferPrepare()
+				const [, , message, signature] = await basicPrepare()
 				const executeRole = await forwarder.EXECUTE_ROLE()
 				const errorMsg = `AccessControl: account ${user.address.toLowerCase()} is missing role ${executeRole}`
 				const forwarderUser = forwarder.connect(user)
@@ -493,9 +493,35 @@ describe('ForwarderUpgradeable', () => {
 					)
 				).to.be.revertedWith('call error')
 			})
+			it('gas invalid', async () => {
+				const [, , message, signature] = await basicPrepare(
+					-1,
+					-1,
+					0,
+					'',
+					10000000000
+				)
+				await expect(
+					forwarder.execute(
+						{
+							from: message.from,
+							to: message.to,
+							value: message.value,
+							gas: message.gas,
+							nonce: message.nonce,
+							expiry: message.expiry,
+							data: message.data,
+						},
+						signature
+					)
+				).eventually.to.rejectedWith(
+					Error,
+					'VM Exception while processing transaction: invalid opcode'
+				)
+			})
 			describe('verify', () => {
 				it('illegal nonce', async () => {
-					const [, , message, signature] = await transferPrepare(100)
+					const [, , message, signature] = await basicPrepare(10)
 					await expect(
 						forwarder.execute(
 							{
@@ -512,7 +538,7 @@ describe('ForwarderUpgradeable', () => {
 					).to.be.revertedWith('illegal nonce')
 				})
 				it('illegal expired', async () => {
-					const [, , message, signature] = await transferPrepare(-1, 1)
+					const [, , message, signature] = await basicPrepare(-1, 1)
 					await expect(
 						forwarder.execute(
 							{
@@ -529,7 +555,7 @@ describe('ForwarderUpgradeable', () => {
 					).to.be.revertedWith('expired')
 				})
 				it('illegal signer', async () => {
-					const [, , message, signature] = await transferPrepare()
+					const [, , message, signature] = await basicPrepare()
 					await expect(
 						forwarder.execute(
 							{
@@ -560,7 +586,7 @@ describe('ForwarderUpgradeable', () => {
 					companyWallet,
 					messageTokenTransfer,
 					signatureTokenTransfer,
-				] = await transferPrepare()
+				] = await basicPrepare()
 
 				const userEthBalance = await ethers.provider.getBalance(
 					userWallet.address
@@ -689,14 +715,118 @@ describe('ForwarderUpgradeable', () => {
 		})
 		describe('fail', () => {
 			it('Cannot be executed from the outside', async () => {
-				await expect(forwarder.batch([], [])).to.be.revertedWith(
+				const nextMessage = createMessage(
+					ethers.constants.AddressZero,
+					ethers.constants.AddressZero,
+					0,
+					0,
+					0,
+					0,
+					'0x'
+				)
+				await expect(forwarder.batch([nextMessage], ['0x'])).to.be.revertedWith(
 					'inner execute only'
+				)
+			})
+			it('request does not exist', async () => {
+				await expect(forwarder.batch([], [])).to.be.revertedWith(
+					'request does not exist'
 				)
 			})
 			it('Arguments must have the same number of arrays to be executed.', async () => {
 				await expect(forwarder.batch([], ['0x'])).to.be.revertedWith(
 					'illegal params'
 				)
+			})
+			it('Batch functions cannot be executed from batch functions.', async () => {
+				const batchWallet = Wallet.createRandom()
+				const ifaceInnerBatch = new ethers.utils.Interface([
+					'function batch(tuple(address from, address to, uint256 value, uint256 gas, uint256 nonce, uint256 expiry, bytes data)[] reqs, bytes[] signatures)',
+				])
+				const functionInnerBatch = ifaceInnerBatch.encodeFunctionData('batch', [
+					[
+						{
+							from: ethers.constants.AddressZero,
+							to: ethers.constants.AddressZero,
+							value: 0,
+							gas: 0,
+							nonce: 0,
+							expiry: 0,
+							data: '0x',
+						},
+					],
+					['0x'],
+				])
+				const expiry = await getDeadLine()
+				const batchNonce = await forwarder.getNonce(batchWallet.address)
+				const messageInnerBatch = createMessage(
+					batchWallet.address,
+					forwarder.address,
+					0,
+					100000000,
+					batchNonce.add(1).toNumber(),
+					expiry,
+					functionInnerBatch
+				)
+				const msgParamsInnerBatch = await createMessageParam(
+					messageInnerBatch,
+					forwarder.address
+				)
+				const signatureInnerBatch = signTypedData({
+					privateKey: toBuffer(batchWallet.privateKey),
+					data: msgParamsInnerBatch,
+					version: SignTypedDataVersion.V4,
+				})
+				// Batch
+				const ifaceBatch = new ethers.utils.Interface([
+					'function batch(tuple(address from, address to, uint256 value, uint256 gas, uint256 nonce, uint256 expiry, bytes data)[] reqs, bytes[] signatures)',
+				])
+				const functionEncodedBatch = ifaceBatch.encodeFunctionData('batch', [
+					[
+						{
+							from: messageInnerBatch.from,
+							to: messageInnerBatch.to,
+							value: messageInnerBatch.value,
+							gas: messageInnerBatch.gas,
+							nonce: messageInnerBatch.nonce,
+							expiry: messageInnerBatch.expiry,
+							data: messageInnerBatch.data,
+						},
+					],
+					[signatureInnerBatch],
+				])
+				const messageBatch = createMessage(
+					batchWallet.address,
+					forwarder.address,
+					0,
+					100000000,
+					batchNonce.toNumber(),
+					expiry,
+					functionEncodedBatch
+				)
+				const msgParamsBatch = await createMessageParam(
+					messageBatch,
+					forwarder.address
+				)
+				const signatureBatch = signTypedData({
+					privateKey: toBuffer(batchWallet.privateKey),
+					data: msgParamsBatch,
+					version: SignTypedDataVersion.V4,
+				})
+				await expect(
+					forwarder.execute(
+						{
+							from: messageBatch.from,
+							to: messageBatch.to,
+							value: messageBatch.value,
+							gas: messageBatch.gas,
+							nonce: messageBatch.nonce,
+							expiry: messageBatch.expiry,
+							data: messageBatch.data,
+						},
+						signatureBatch
+					)
+				).to.be.revertedWith('call error')
 			})
 		})
 	})
