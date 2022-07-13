@@ -35,7 +35,7 @@
 		"@types/chai": "4.3.1",
 		"@types/dotenv": "8.2.0",
 		"@types/mocha": "9.1.1",
-		"@types/node": "16.11.43",
+		"@types/node": "16.11.44",
 		"@typescript-eslint/eslint-plugin": "5.30.6",
 		"@typescript-eslint/parser": "5.30.6",
 		"@types/chai-as-promised": "7.1.5",
