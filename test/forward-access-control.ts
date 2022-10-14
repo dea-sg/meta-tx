@@ -4,7 +4,7 @@ import { ethers /* upgrades */ } from 'hardhat'
 import { Wallet } from 'ethers'
 import { solidity } from 'ethereum-waffle'
 import { makeSnapshot, resetChain } from './utils'
-import { ForwarderAccessControlUpgradeable } from '../typechain-types'
+import type { ForwarderAccessControlUpgradeable } from '../typechain-types'
 
 use(solidity)
 

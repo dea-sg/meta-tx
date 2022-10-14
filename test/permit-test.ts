@@ -7,17 +7,19 @@
 /* eslint-disable new-cap */
 
 // TODO これらの警告も削除する
-import { signTypedMessage, TypedMessage } from 'eth-sig-util'
+import type { TypedMessage } from 'eth-sig-util'
+import { signTypedMessage } from 'eth-sig-util'
 import { toBuffer, fromRpcSig } from 'ethereumjs-util'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { Contract, Wallet } from 'ethers'
+import type { Contract } from 'ethers'
+import { Wallet } from 'ethers'
 
-interface MessageTypeProperty {
+type MessageTypeProperty = {
 	name: string
 	type: string
 }
-interface MessageTypes {
+type MessageTypes = {
 	EIP712Domain: MessageTypeProperty[]
 	[additionalProperties: string]: MessageTypeProperty[]
 }

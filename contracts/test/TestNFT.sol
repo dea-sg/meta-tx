@@ -11,6 +11,10 @@ contract TestNFT is
 	AccessControlEnumerableUpgradeable
 {
 	bytes32 public constant MINT_ROLE = keccak256("MINT_ROLE");
+	bytes32 public constant ITEM_ROLE = keccak256("ITEM_ROLE");
+	address public forwarder;
+	mapping(uint256 => uint256) public itemCounter;
+	mapping(address => mapping(uint256 => uint256)) public itemIdMap;
 
 	function initialize(address _forwarderAccessControl) public initializer {
 		__MetaTxContext_init(_forwarderAccessControl);
@@ -21,6 +25,27 @@ contract TestNFT is
 
 	function mint(address to, uint256 tokenId) external onlyRole(MINT_ROLE) {
 		_mint(to, tokenId);
+	}
+
+	function mintItem(address to, uint256 nonce) external {
+		require(forwarder == msg.sender, "error!!!!!!");
+		uint256 itemId = itemIdMap[to][nonce];
+		uint256 count = itemCounter[itemId];
+		uint256 tokenId = itemId * 1000 + count;
+		_mint(to, tokenId);
+		itemCounter[itemId] = count + 1;
+	}
+
+	function setForwarder(address _forwarder) external {
+		forwarder = _forwarder;
+	}
+
+	function setKey(
+		address to,
+		uint256 nonce,
+		uint256 itemId
+	) external onlyRole(ITEM_ROLE) {
+		itemIdMap[to][nonce] = itemId;
 	}
 
 	function _msgSender()

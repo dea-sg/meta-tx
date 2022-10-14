@@ -4,11 +4,8 @@
 /* eslint-disable new-cap */
 /* eslint-disable max-params */
 
-import {
-	signTypedData,
-	TypedMessage,
-	SignTypedDataVersion,
-} from '@metamask/eth-sig-util'
+import type { TypedMessage } from '@metamask/eth-sig-util'
+import { signTypedData, SignTypedDataVersion } from '@metamask/eth-sig-util'
 import { toBuffer } from 'ethereumjs-util'
 import { expect, use } from 'chai'
 import { ethers } from 'hardhat'
@@ -16,7 +13,7 @@ import { solidity } from 'ethereum-waffle'
 import * as t from 'chai-as-promised'
 import { Wallet, BigNumber } from 'ethers'
 import { makeSnapshot, resetChain } from './utils'
-import {
+import type {
 	ForwarderAccessControlUpgradeable,
 	ForwarderUpgradeable,
 	ExampleToken,
@@ -26,11 +23,11 @@ import {
 use(solidity)
 use(t.default)
 
-interface MessageTypeProperty {
+type MessageTypeProperty = {
 	name: string
 	type: string
 }
-interface MessageTypes {
+type MessageTypes = {
 	EIP712Domain: MessageTypeProperty[]
 	[additionalProperties: string]: MessageTypeProperty[]
 }

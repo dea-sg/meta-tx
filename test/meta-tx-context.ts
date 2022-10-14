@@ -4,7 +4,7 @@ import { ethers } from 'hardhat'
 import { Wallet } from 'ethers'
 import { solidity } from 'ethereum-waffle'
 import { makeSnapshot, resetChain } from './utils'
-import {
+import type {
 	MinimalMetaTxContextUpgradeable,
 	ForwarderAccessControlUpgradeable,
 } from '../typechain-types'
