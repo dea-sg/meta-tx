@@ -5775,10 +5775,10 @@ hard-rejection@^2.1.0:
   resolved "https://registry.yarnpkg.com/hard-rejection/-/hard-rejection-2.1.0.tgz#1c6eda5c1685c63942766d79bb40ae773cecd883"
   integrity sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA==
 
-hardhat@2.16.0:
-  version "2.16.0"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.16.0.tgz#c5611d433416b31f6ce92f733b1f1b5236ad6230"
-  integrity sha512-7VQEJPQRAZdtrYUZaU9GgCpP3MBNy/pTdscARNJQMWKj5C+R7V32G5uIZKIqZ4QiqXa6CBfxxe+G+ahxUbHZHA==
+hardhat@2.16.1:
+  version "2.16.1"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.16.1.tgz#fd2288ce44f6846a70ba332b3d8158522447262a"
+  integrity sha512-QpBjGXFhhSYoYBGEHyoau/A63crZOP+i3GbNxzLGkL6IklzT+piN14+wGnINNCg5BLSKisQI/RAySPzaWRcx/g==
   dependencies:
     "@ethersproject/abi" "^5.1.2"
     "@metamask/eth-sig-util" "^4.0.0"
