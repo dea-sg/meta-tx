@@ -39,7 +39,7 @@
 		"@typescript-eslint/eslint-plugin": "7.1.1",
 		"@typescript-eslint/parser": "7.1.1",
 		"@types/chai-as-promised": "7.1.8",
-		"chai": "4.4.1",
+		"chai": "4.5.0",
 		"chai-as-promised": "7.1.2",
 		"del-cli": "5.1.0",
 		"dotenv": "16.4.5",
