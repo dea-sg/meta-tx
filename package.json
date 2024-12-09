@@ -33,7 +33,7 @@
 		"@typechain/ethers-v5": "11.1.2",
 		"@typechain/hardhat": "7.0.0",
 		"@types/chai": "4.3.20",
-		"@types/dotenv": "8.2.0",
+		"@types/dotenv": "8.2.3",
 		"@types/mocha": "10.0.7",
 		"@types/node": "20.14.12",
 		"@typescript-eslint/eslint-plugin": "7.1.1",
