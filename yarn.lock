@@ -1347,10 +1347,10 @@
     "@metamask/superstruct" "^3.1.0"
     "@metamask/utils" "^9.0.0"
 
-"@metamask/eth-sig-util@7.0.3":
-  version "7.0.3"
-  resolved "https://registry.yarnpkg.com/@metamask/eth-sig-util/-/eth-sig-util-7.0.3.tgz#be9e444fe0b8474c04e2ff42fd983173767f6ac0"
-  integrity sha512-PAtGnOkYvh90k2lEZldq/FK7GTLF6WxE+2bV85PoA3pqlJnmJCAY62tuvxHSwnVngSKlc4mcNvjnUg2eYO6JGg==
+"@metamask/eth-sig-util@8.1.1":
+  version "8.1.1"
+  resolved "https://registry.yarnpkg.com/@metamask/eth-sig-util/-/eth-sig-util-8.1.1.tgz#7385cd392798afd557265480d88be23098637858"
+  integrity sha512-Pfi4DKTBWsfoVg3rbBS7EJq2MYvgbC/1xWzQw2vWxU5eCHUaylUSiuUYpf1e/zYRPJmiLOBx+44e5tOE/MEK3w==
   dependencies:
     "@ethereumjs/util" "^8.1.0"
     "@metamask/abi-utils" "^2.0.4"
